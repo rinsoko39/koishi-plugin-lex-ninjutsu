@@ -35,12 +35,12 @@
             }
         },
         "ninjutsu.search": {
-            "description": "根据关键字查询相关忍术。支持正则表达式。",
+            "description": "根据关键字搜索相关忍术。支持正则表达式。",
             "arguments": {
                 "keyword": "关键字"
             },
             "messages": {
-                "no-result": "未查询到相关忍术。",
+                "no-result": "未搜索到相关忍术。",
                 "result-title": "找到以下相关忍术：",
                 "result-item": "·{name}\n简介：{description}"
             }

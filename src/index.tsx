@@ -60,7 +60,7 @@ class LexNinjutsu {
             .alias('ninjutsu.\u91ca\u653e', '\u91ca\u653e\u5fcd\u672f')
             .action(({ session }, name) => this.releaseNinjutsu(session, name));
         this.ctx.command('ninjutsu.search <keyword:text>')
-            .alias('ninjutsu.\u67e5\u8be2', 'ninjutsu.\u67e5\u627e', 'ninjutsu.\u641c\u7d22')
+            .alias('ninjutsu.\u641c\u7d22')
             .option('limit', '-l [limit:number]')
             .action(({ session, options }, keyword) => this.searchNinjutsu(session, options.limit, keyword));
     }
