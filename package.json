@@ -1,22 +1,31 @@
 {
-  "name": "koishi-plugin-lex-ninjutsu",
-  "description": "使用 bot 释放忍术",
-  "version": "0.0.1",
-  "main": "lib/index.js",
-  "typings": "lib/index.d.ts",
-  "files": [
-    "lib",
-    "dist"
-  ],
-  "license": "MIT",
-  "scripts": {},
-  "keywords": [
-    "chatbot",
-    "koishi",
-    "plugin"
-  ],
-  "devDependencies": {},
-  "peerDependencies": {
-    "koishi": "^4.18.7"
-  }
+    "name": "koishi-plugin-lex-ninjutsu",
+    "description": "Release Lex-Ninjutsu using Koishi bot.",
+    "version": "1.0.0",
+    "main": "lib/index.js",
+    "typings": "lib/index.d.ts",
+    "files": [
+        "lib",
+        "dist"
+    ],
+    "license": "MIT",
+    "scripts": {},
+    "keywords": [
+        "chatbot",
+        "koishi",
+        "plugin"
+    ],
+    "devDependencies": {
+        "koishi-plugin-pinyin": "^0.3.0"
+    },
+    "peerDependencies": {
+        "@satorijs/element": "^3.1.8",
+        "koishi": "^4.18.7"
+    },
+    "koishi": {
+        "service": {
+            "required": ["database"],
+            "optional": ["pinyin"]
+        }
+    }
 }

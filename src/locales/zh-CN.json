@@ -1,0 +1,41 @@
+{
+    "commands": {
+        "ninjutsu.update": {
+            "description": "从忍法帖更新忍术信息。",
+            "messages": {
+                "completed": "忍术信息已更新，共 {0} 个忍术。"
+            }
+        },
+        "ninjutsu.clear": {
+            "description": "清空当前忍术信息。",
+            "messages": {
+                "completed": "忍术信息已清空。"
+            }
+        },
+        "ninjutsu.info": {
+            "description": "获取忍术信息。",
+            "arguments": {
+                "name": "忍术名称"
+            },
+            "messages": {
+                "not-found": "未找到忍术。",
+                "info": "{name}\n{description}\n{url}",
+                "more-info": "更多信息"
+            }
+        },
+        "ninjutsu.release": {
+            "description": "释放忍术。播放忍术音频。",
+            "arguments": {
+                "name": "忍术名称"
+            },
+            "messages": {
+                "not-found": "未找到忍术。",
+                "no-audio": "该忍术暂无音频。"
+            }
+        }
+    },
+    "_config": {
+        "sourceUrl": "忍法帖（忍术交流网站）地址（默认为 wsfrs.com）。将从该地址获取忍术信息。该设置为后续可能出现的镜像站保留。",
+        "matchLevel": "忍术匹配等级。strict：忍术名必须与忍法帖中完全一致才呢匹配（不推荐）。normal：忽略特殊字符，忍术名中的字与忍法帖中一致即可匹配。homophone：忍术名与忍法帖中的忍术同音即可匹配。需提供 pinyin 服务以解析拼音。"
+    }
+}
