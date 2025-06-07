@@ -150,7 +150,7 @@ class LexNinjutsu {
 namespace LexNinjutsu {
 
     export const inject = {
-        'required': ['database'],
+        'required': ['database', 'http'],
         'optional': ['pinyin']
     };
 

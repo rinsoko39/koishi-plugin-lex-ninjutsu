@@ -24,7 +24,7 @@
     },
     "koishi": {
         "service": {
-            "required": ["database"],
+            "required": ["database", "http"],
             "optional": ["pinyin"]
         }
     }
