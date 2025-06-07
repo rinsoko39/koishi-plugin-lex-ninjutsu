@@ -19,8 +19,8 @@
             },
             "messages": {
                 "not-found": "未找到忍术。",
-                "info": "{name}\n{description}\n{url}",
-                "more-info": "更多信息"
+                "not-found-try-search": "未找到忍术，正在尝试搜索相关忍术……",
+                "info": "{name}\n{description}\n更多信息：{url}"
             }
         },
         "ninjutsu.release": {
@@ -30,12 +30,27 @@
             },
             "messages": {
                 "not-found": "未找到忍术。",
+                "not-found-try-search": "未找到忍术，正在尝试搜索相关忍术……",
                 "no-audio": "该忍术暂无音频。"
+            }
+        },
+        "ninjutsu.search": {
+            "description": "根据关键字查询相关忍术。支持正则表达式。",
+            "arguments": {
+                "keyword": "关键字"
+            },
+            "messages": {
+                "no-result": "未查询到相关忍术。",
+                "result-title": "找到以下相关忍术：",
+                "result-item": "·{name}\n简介：{description}"
             }
         }
     },
     "_config": {
         "sourceUrl": "忍法帖（忍术交流网站）地址（默认为 wsfrs.com）。将从该地址获取忍术信息。该设置为后续可能出现的镜像站保留。",
-        "matchLevel": "忍术匹配等级。strict：忍术名必须与忍法帖中完全一致才呢匹配（不推荐）。normal：忽略特殊字符，忍术名中的字与忍法帖中一致即可匹配。homophone：忍术名与忍法帖中的忍术同音即可匹配。需提供 pinyin 服务以解析拼音。"
+        "matchLevel": "忍术匹配等级。strict：忍术名必须与忍法帖中完全一致才呢匹配（不推荐）。normal：忽略特殊字符，忍术名中的字与忍法帖中一致即可匹配。homophone：忍术名与忍法帖中的忍术同音即可匹配。需提供 pinyin 服务以解析拼音。",
+        "searchLimit": "忍术搜索默认数量上限。",
+        "descriptionPreviewLimit": "忍术描述的字数上限。若为 0 则无字数上限。",
+        "searchOnFailed": "是否在未找到忍术时搜索相关忍术。"
     }
 }

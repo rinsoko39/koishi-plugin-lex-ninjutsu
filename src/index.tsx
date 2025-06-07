@@ -1,4 +1,4 @@
-import { $, Argv, Context, Schema } from 'koishi';
+import { $, Context, Schema, Session } from 'koishi';
 import NinjutsuPinyin from './pinyin';
 
 declare module 'koishi' {
@@ -49,19 +49,24 @@ class LexNinjutsu {
         this.ctx.command('ninjutsu').alias('\u5fcd\u672f');
         this.ctx.command('ninjutsu.update', { authority: 3 })
             .alias('ninjutsu.\u66f4\u65b0')
-            .action(this.updateDatabase.bind(this));
+            .action(({ session }) => this.updateDatabase(session));
         this.ctx.command('ninjutsu.clear', { authority: 4 })
             .alias('ninjutsu.\u6e05\u7a7a')
-            .action(this.clearDatabase.bind(this));
+            .action(({ session }) => this.clearDatabase(session));
         this.ctx.command('ninjutsu.info <name:text>')
             .alias('ninjutsu.\u4fe1\u606f')
-            .action(this.getNinjutsuInfo.bind(this));
+            .action(({ session }, name) => this.getNinjutsuInfo(session, name));
         this.ctx.command('ninjutsu.release <name:text>')
             .alias('ninjutsu.\u91ca\u653e', '\u91ca\u653e\u5fcd\u672f')
-            .action(this.releaseNinjutsu.bind(this));
+            .action(({ session }, name) => this.releaseNinjutsu(session, name));
+        this.ctx.command('ninjutsu.search <keyword:text>')
+            .alias('ninjutsu.\u67e5\u8be2', 'ninjutsu.\u67e5\u627e', 'ninjutsu.\u641c\u7d22')
+            .option('limit', '-l [limit:number]')
+            .action(({ session, options }, keyword) => this.searchNinjutsu(session, options.limit, keyword));
     }
 
-    async updateDatabase({ session }: Argv) {
+    // MARK: ninjutsu.update
+    async updateDatabase(session: Session) {
         let data = await this.ctx.http.get<NinjutsuSourceData>(`${this.cfg.sourceUrl}/api/jutsus`);
         let total = data.pagination.total;
         data = await this.ctx.http.get<NinjutsuSourceData>(`${this.cfg.sourceUrl}/api/jutsus?limit=${total}`);
@@ -71,34 +76,35 @@ class LexNinjutsu {
         return session.text('.completed', [total]);
     }
 
-    async clearDatabase({ session }: Argv) {
-        await this.ctx.database.remove('ninjutsu', { id: { $gt: 0 }});
-        return session.text('.completed');
-    }
-
     toNinjutsuInfo({ id, name, description }: NinjutsuInfoSourceData) {
         let nameNoPunctuation = removePunctuation(name);
         return { id, name, description, nameNoPunctuation };
     }
 
-    async getNinjutsuInfo({ session }: Argv, name: string) {
+    // MARK: ninjutsu.clear
+    async clearDatabase(session: Session) {
+        await this.ctx.database.remove('ninjutsu', { id: { $gt: 0 }});
+        return session.text('.completed');
+    }
+
+    // MARK: ninjutsu.info
+    async getNinjutsuInfo(session: Session, name: string) {
         let ninjutsu = await this.tryGetNinjutsu(name);
         if(ninjutsu === undefined) {
-            return session.text('.not-found');
+            return await this.onNotfound(session, name);
         }
         return session.text('.info', {
             name: ninjutsu.name,
             description: ninjutsu.description,
-            url: <a href={`${this.cfg.sourceUrl}/jutsus/${ninjutsu.id}`}>
-                {session.text('.more-info')}
-            </a>
+            url: `${this.cfg.sourceUrl}/jutsus/${ninjutsu.id}`
         })
     }
 
-    async releaseNinjutsu({ session }: Argv, name: string) {
+    // MARK: ninjutsu.release
+    async releaseNinjutsu(session: Session, name: string) {
         let ninjutsu = await this.tryGetNinjutsu(name);
         if(ninjutsu === undefined) {
-            return session.text('.not-found');
+            return await this.onNotfound(session, name);
         }
         let audios = await this.getNinjutsuAudios(ninjutsu.id);
         if(!audios.length) {
@@ -119,22 +125,19 @@ class LexNinjutsu {
         return undefined;
     }
 
-    async tryGetNinjutsuAtLevel(name: string, matchLevel: LexNinjutsu.MatchLevel): Promise<NinjutsuInfo|undefined> {
-        if(matchLevel === LexNinjutsu.MatchLevel.Homophone && !this.ctx.pinyin) {
-            return undefined;
+    async onNotfound(session: Session, name: string) {
+        if(!this.cfg.searchOnFailed) {
+            return session.text('.not-found');
         }
-        let target = {
-            [LexNinjutsu.MatchLevel.Strict]: () => name,
-            [LexNinjutsu.MatchLevel.Normal]: () => removePunctuation(name),
-            [LexNinjutsu.MatchLevel.Homophone]: () => this.ctx.bail('get-pinyin', removePunctuation(name))
-        }[matchLevel]();
-        let property = {
-            [LexNinjutsu.MatchLevel.Strict]: 'name',
-            [LexNinjutsu.MatchLevel.Normal]: 'nameNoPunctuation',
-            [LexNinjutsu.MatchLevel.Homophone]: 'namePinyin'
-        }[matchLevel];
+        await session.sendQueued(session.text('.not-found-try-search'));
+        return session.execute(`ninjutsu.search ${name}`);
+    }
+
+    async tryGetNinjutsuAtLevel(name: string, matchLevel: LexNinjutsu.MatchLevel): Promise<NinjutsuInfo|undefined> {
+        let { getKeyword, propertyName } = this.getMatchInfo(matchLevel);
+        let keyword = getKeyword(name);
         let res = await this.ctx.database.select('ninjutsu')
-            .where((row) => $.eq(row[property], target))
+            .where((row) => $.eq(row[propertyName], keyword))
             .execute();
         return res[0];
     }
@@ -143,6 +146,80 @@ class LexNinjutsu {
         let url = `${this.cfg.sourceUrl}/api/jutsus/${id}/audios`;
         let data = await this.ctx.http.get<NinjutsuAudioSourceData>(url);
         return data.audios.map((info) => info.audioUrl);
+    }
+
+    // MARK: ninjutsu.search
+    async searchNinjutsu(session: Session, limit: number|undefined, keyword: string) {
+        limit ??= this.cfg.searchLimit;
+        let res: { [id: number]: NinjutsuInfo } = {};
+        let prev = res;
+        for(let level=LexNinjutsu.MatchLevel.Strict; level<=this.cfg.matchLevel; level++) {
+            let ninjutsus = await this.searchNinjutsuAtLevel(keyword, limit, level);
+            let cur: typeof res = {};
+            for(let ninjutsu of ninjutsus) {
+                cur[ninjutsu.id] = ninjutsu;
+            }
+            Object.setPrototypeOf(prev, cur);
+            prev = cur;
+        }
+        let count = 0;
+        let message = '';
+        for(let id in res) {
+            let ninjutsu = res[id];
+            count++;
+            if(count > limit) {
+                continue;
+            }
+            let item = session.text('.result-item', {
+                name: ninjutsu.name,
+                description: this.getDescriptionPreview(ninjutsu.description)
+            });
+            message += '\n' + item;
+        }
+        if(!count) {
+            return session.text('.no-result');
+        }
+        return session.text('.result-title') + message;
+    }
+
+    async searchNinjutsuAtLevel(name: string, limit: number, matchLevel: LexNinjutsu.MatchLevel) {
+        let { getKeyword, propertyName } = this.getMatchInfo(matchLevel);
+        let keyword = getKeyword(name);
+        let res = await this.ctx.database.select('ninjutsu')
+            .where((row) => $.regex(row[propertyName], new RegExp(`.*${keyword}.*`)))
+            .limit(limit)
+            .execute();
+        console.log(res);
+        return res;
+    }
+
+    getDescriptionPreview(description: string) {
+        let limit = this.cfg.descriptionPreviewLimit;
+        if(!limit) {
+            return description
+        }
+        description = description.replaceAll('\n', ' ');
+        if(description.length <= limit) {
+            return description
+        }
+        return description.substring(0, limit) + '\u2026';
+    }
+
+    getMatchInfo(matchLevel: LexNinjutsu.MatchLevel) {
+        if(matchLevel === LexNinjutsu.MatchLevel.Homophone && !this.ctx.pinyin) {
+            matchLevel = LexNinjutsu.MatchLevel.Normal;
+        }
+        let getKeyword = {
+            [LexNinjutsu.MatchLevel.Strict]: (name: string) => name,
+            [LexNinjutsu.MatchLevel.Normal]: (name: string) => removePunctuation(name),
+            [LexNinjutsu.MatchLevel.Homophone]: (name: string) => this.ctx.bail('get-pinyin', removePunctuation(name))
+        }[matchLevel];
+        let propertyName = {
+            [LexNinjutsu.MatchLevel.Strict]: 'name',
+            [LexNinjutsu.MatchLevel.Normal]: 'nameNoPunctuation',
+            [LexNinjutsu.MatchLevel.Homophone]: 'namePinyin'
+        }[matchLevel];
+        return { getKeyword, propertyName };
     }
 
 }
@@ -160,7 +237,10 @@ namespace LexNinjutsu {
 
     export interface Config {
         sourceUrl: string,
-        matchLevel: MatchLevel
+        matchLevel: MatchLevel,
+        searchLimit: number,
+        descriptionPreviewLimit: number,
+        searchOnFailed: boolean
     }
 
     export const Config: Schema<LexNinjutsu.Config> = Schema.object({
@@ -169,7 +249,10 @@ namespace LexNinjutsu {
             Schema.const(MatchLevel.Strict).description('strict'),
             Schema.const(MatchLevel.Normal).description('normal'),
             Schema.const(MatchLevel.Homophone).description('homophone')
-        ]).default(MatchLevel.Normal).role('radio')
+        ]).default(MatchLevel.Normal).role('radio'),
+        searchLimit: Schema.number().min(1).step(1).default(10),
+        descriptionPreviewLimit: Schema.number().min(0).step(1).default(10),
+        searchOnFailed: Schema.boolean().default(true)
     }).i18n({
         'zh-CN': require('./locales/zh-CN.json')._config
     });
